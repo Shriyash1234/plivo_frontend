@@ -7,6 +7,7 @@ Next.js 16 frontend for the status page platform. Features include:
 - Admin dashboard for managing services and incidents
 - Shared auth state + API client hitting the Express/Mongo backend
 - Uses shadcn/ui components and Tailwind CSS v4
+- Home page lists available organizations pulled from `/api/public/organizations`, so visitors can browse status pages without memorising IDs.
 
 ## Prerequisites
 
@@ -19,7 +20,7 @@ Create `.env.local` in `frontend/`:
 
 ```ini
 NEXT_PUBLIC_API_URL=http://localhost:5000/api
-# optional: pre-fill the public landing page
+# optional: auto-load a specific org on first render
 NEXT_PUBLIC_DEFAULT_ORGANIZATION=<org-id-or-slug>
 ```
 
@@ -38,14 +39,14 @@ The UI uses the App Router. Authenticated routes live under `/dashboard`, while 
 - `src/services/api-client.js` – fetch helper adding JWT header when present
 - `src/app/(auth)/*` – login and register flows
 - `src/app/(dashboard)/dashboard/*` – admin surface (overview, services, incidents)
-- `src/app/page.js` – public status page consuming `/api/public/status`
+- `src/app/page.js` – public status page consuming `/api/public/organizations` + `/api/public/status`
 
 ## Testing the UI
 
 1. Run backend + MongoDB.
 2. Register a user at `/register` (creates org) or use invite flow.
 3. Login at `/login`, then manage services/incidents in `/dashboard`.
-4. Visit `/` with the organization id/slug to see the public snapshot.
+4. Visit `/` and pick an organization from the dropdown. The page loads service/incident data automatically (you can still deep-link using `NEXT_PUBLIC_DEFAULT_ORGANIZATION`).
 
 ## Realtime
 
