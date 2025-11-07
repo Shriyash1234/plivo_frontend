@@ -4,10 +4,10 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { apiClient } from '@/services/api-client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { fetchPublicOrganizations, fetchStatusSnapshot } from '@/services/public';
 
 const STATUS_COLORS = {
   Operational: 'bg-emerald-500',
@@ -22,16 +22,17 @@ export default function PublicStatusPage() {
   const [query, setQuery] = useState(DEFAULT_ORG);
   const [statusData, setStatusData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [organizations, setOrganizations] = useState([]);
+  const [orgLoading, setOrgLoading] = useState(false);
 
   const loadStatus = async (identifier = query) => {
     if (!identifier) {
-      toast.error('Provide an organization ID or slug');
+      toast.error('Select an organization to view status');
       return;
     }
     setLoading(true);
     try {
-      const params = new URLSearchParams({ organizationId: identifier });
-      const data = await apiClient.get(`/public/status?${params.toString()}`);
+      const data = await fetchStatusSnapshot(identifier);
       setStatusData(data);
     } catch (error) {
       console.error(error);
@@ -43,9 +44,29 @@ export default function PublicStatusPage() {
   };
 
   useEffect(() => {
+    const loadOrganizations = async () => {
+      setOrgLoading(true);
+      try {
+        const list = await fetchPublicOrganizations();
+        setOrganizations(list);
+        if (list.length && !DEFAULT_ORG) {
+          setQuery(list[0].id);
+          loadStatus(list[0].id);
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error(error.message);
+      } finally {
+        setOrgLoading(false);
+      }
+    };
+
+    loadOrganizations();
+
     if (DEFAULT_ORG) {
       loadStatus(DEFAULT_ORG);
     }
+
     // TODO: integrate socket.io-client subscription to /status:update events once available.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -76,21 +97,29 @@ export default function PublicStatusPage() {
             </p>
           </div>
 
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              loadStatus(query);
-            }}
-            className="flex flex-col gap-3 sm:flex-row sm:items-center"
-          >
-            <Input
-              placeholder="Organization ID or slug"
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Select
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="sm:max-w-sm"
-            />
+              onValueChange={(value) => {
+                setQuery(value);
+                if (value) {
+                  loadStatus(value);
+                }
+              }}
+            >
+              <SelectTrigger className="sm:max-w-sm" disabled={orgLoading || loading}>
+                <SelectValue placeholder="Select organization" />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.map((organization) => (
+                  <SelectItem key={organization.id} value={organization.id}>
+                    {organization.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="flex items-center gap-2">
-              <Button type="submit" disabled={loading}>
+              <Button type="button" disabled={loading || !query} onClick={() => loadStatus(query)}>
                 {loading ? 'Fetching status...' : 'Load'}
               </Button>
               <Button
@@ -102,7 +131,7 @@ export default function PublicStatusPage() {
                 Refresh
               </Button>
             </div>
-          </form>
+          </div>
 
           <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3">
             <span className={`h-3 w-3 rounded-full ${statusDotClass}`} />
