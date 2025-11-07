@@ -2,6 +2,19 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
   "http://localhost:4500/api";
 
+const deriveSocketUrl = () => {
+  try {
+    const url = new URL(API_BASE_URL);
+    // remove trailing /api if present in pathname
+    const pathname = url.pathname.replace(/\/api$/, "");
+    return `${url.protocol}//${url.host}${pathname === "/" ? "" : pathname}`;
+  } catch (error) {
+    return API_BASE_URL.replace(/\/api$/, "");
+  }
+};
+
+const SOCKET_URL = deriveSocketUrl();
+
 class ApiClient {
   constructor() {
     this.token = null;
@@ -79,3 +92,4 @@ class ApiClient {
 
 export const apiClient = new ApiClient();
 export const API_URL = API_BASE_URL;
+export const SOCKET_ENDPOINT = SOCKET_URL;

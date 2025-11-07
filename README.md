@@ -50,13 +50,9 @@ The UI uses the App Router. Authenticated routes live under `/dashboard`, while 
 
 ## Realtime
 
-The backend broadcasts `status:update` over Socket.io. Install the frontend dependency when connectivity/permissions allow:
-
-```bash
-npm install socket.io-client
-```
-
-Then wire `socket.io-client` inside the public page and dashboard to subscribe to updates (see TODO in `src/app/page.js`).
+- Socket.io client support ships with the repo (`socket.io-client` dependency).
+- Ensure dependencies are installed (`npm install`) after pulling new changes.
+- `src/app/page.js` already subscribes to `status:update` events; any incident/service change will automatically refresh the public status view.
 
 ## Production
 

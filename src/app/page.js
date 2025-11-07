@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { io } from 'socket.io-client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SOCKET_ENDPOINT } from '@/services/api-client';
 import { fetchPublicOrganizations, fetchStatusSnapshot } from '@/services/public';
 
 const STATUS_COLORS = {
@@ -19,29 +21,50 @@ const STATUS_COLORS = {
 const DEFAULT_ORG = process.env.NEXT_PUBLIC_DEFAULT_ORGANIZATION ?? '';
 
 export default function PublicStatusPage() {
-  const [query, setQuery] = useState(DEFAULT_ORG);
+  const [selectedOrg, setSelectedOrg] = useState(DEFAULT_ORG);
   const [statusData, setStatusData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [organizations, setOrganizations] = useState([]);
   const [orgLoading, setOrgLoading] = useState(false);
+  const queryRef = useRef(selectedOrg);
 
-  const loadStatus = async (identifier = query) => {
-    if (!identifier) {
-      toast.error('Select an organization to view status');
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await fetchStatusSnapshot(identifier);
-      setStatusData(data);
-    } catch (error) {
-      console.error(error);
-      toast.error(error.message);
-      setStatusData(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    queryRef.current = selectedOrg;
+  }, [selectedOrg]);
+
+  const loadStatus = useCallback(
+    async (identifier, options = {}) => {
+      const targetOrg = identifier ?? queryRef.current;
+      const { showSpinner = true, suppressToast = false } = options;
+
+      if (!targetOrg) {
+        if (!suppressToast) {
+          toast.error('Select an organization to view status');
+        }
+        return;
+      }
+
+      if (showSpinner) {
+        setLoading(true);
+      }
+
+      try {
+        const data = await fetchStatusSnapshot(targetOrg);
+        setStatusData(data);
+      } catch (error) {
+        console.error(error);
+        if (!suppressToast) {
+          toast.error(error.message);
+          setStatusData(null);
+        }
+      } finally {
+        if (showSpinner) {
+          setLoading(false);
+        }
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const loadOrganizations = async () => {
@@ -50,8 +73,8 @@ export default function PublicStatusPage() {
         const list = await fetchPublicOrganizations();
         setOrganizations(list);
         if (list.length && !DEFAULT_ORG) {
-          setQuery(list[0].id);
-          loadStatus(list[0].id);
+          setSelectedOrg(list[0].id);
+          await loadStatus(list[0].id);
         }
       } catch (error) {
         console.error(error);
@@ -64,12 +87,29 @@ export default function PublicStatusPage() {
     loadOrganizations();
 
     if (DEFAULT_ORG) {
+      setSelectedOrg(DEFAULT_ORG);
       loadStatus(DEFAULT_ORG);
     }
+  }, [loadStatus]);
 
-    // TODO: integrate socket.io-client subscription to /status:update events once available.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => {
+    const socket = io(SOCKET_ENDPOINT, {
+      transports: ['websocket'],
+      withCredentials: true,
+    });
+
+    socket.on('status:update', () => {
+      const currentOrg = queryRef.current;
+      if (currentOrg) {
+        loadStatus(currentOrg, { showSpinner: false, suppressToast: true });
+      }
+    });
+
+    return () => {
+      socket.off('status:update');
+      socket.disconnect();
+    };
+  }, [loadStatus]);
 
   const overallStatus = statusData?.overallStatus ?? 'Unknown';
 
@@ -109,9 +149,9 @@ export default function PublicStatusPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Select
-              value={query}
+              value={selectedOrg}
               onValueChange={(value) => {
-                setQuery(value);
+                setSelectedOrg(value);
                 if (value) {
                   loadStatus(value);
                 }
@@ -129,7 +169,11 @@ export default function PublicStatusPage() {
               </SelectContent>
             </Select>
             <div className="flex items-center gap-2">
-              <Button type="button" disabled={loading || !query} onClick={() => loadStatus(query)}>
+              <Button
+                type="button"
+                disabled={loading || !selectedOrg}
+                onClick={() => loadStatus(selectedOrg)}
+              >
                 {loading ? 'Fetching status...' : 'Load'}
               </Button>
               <Button
