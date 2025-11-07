@@ -82,12 +82,22 @@ export default function PublicStatusPage() {
       <header className="border-b border-border bg-card/80 backdrop-blur">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6">
           <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Status page</span>
-              <span>•</span>
-              <span>
-                {statusData?.organization?.name ?? 'Enter organization to view status'}
-              </span>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Status page</span>
+                <span>•</span>
+                <span>
+                  {statusData?.organization?.name ?? 'Enter organization to view status'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/register">Create workspace</Link>
+                </Button>
+                <Button asChild size="sm">
+                  <Link href="/login">Login</Link>
+                </Button>
+              </div>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight">
               {statusData?.organization?.name ?? 'System availability'}
